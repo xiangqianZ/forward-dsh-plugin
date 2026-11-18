@@ -1,0 +1,7 @@
+# Bundle patch for @forward/workspace-model.
+#
+# `name` must match the package manifest verbatim. The row id is stable and is
+# what the Plugins page toggles.
+- insert:
+    - id: workspace-model
+      name: '@forward/workspace-model'

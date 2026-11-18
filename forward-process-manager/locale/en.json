@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Project process manager",
+    "description": "Adds a Project processes button in the session header beside Commit. It lists only project processes that own a listening TCP/UDP port; click the button again to toggle the panel off. Clicking Stop sends SIGKILL immediately with no confirmation or second step. Process discovery uses ps and lsof; only the authenticated local page can call the Host route."
+  }
+}

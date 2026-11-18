@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" role="img" aria-label="Project processes">
+  <g fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 10h12"/>
+    <path d="M6 17.5h8"/>
+    <path d="M6 25h12"/>
+    <rect x="20.5" y="14" width="9.5" height="9.5" rx="2"/>
+    <path d="M23.3 18.75h3.9"/>
+  </g>
+</svg>

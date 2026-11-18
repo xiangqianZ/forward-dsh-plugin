@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Commit and push",
+    "description": "A Session-header button that opens a dialog showing the current branch and change count, then stages, commits, and pushes in one action.",
+    "detail": "docs/DETAIL.md"
+  }
+}

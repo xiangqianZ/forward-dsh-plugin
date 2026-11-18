@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" role="img" aria-label="Workspace model">
+  <g fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 10.5h9l2.4 3H31a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2Z"/>
+    <rect x="10.5" y="19" width="15" height="9" rx="2"/>
+    <path d="M14 23.5h8"/>
+    <path d="M25.5 19v-2.5M29.5 19v-2.5"/>
+  </g>
+</svg>

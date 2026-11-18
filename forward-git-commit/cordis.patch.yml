@@ -1,0 +1,12 @@
+# Bundle patch: one row, mounted by the Loader when this package is listed in
+# the profile's `dsh.profile.bundles`.
+#
+# `name` must be the manifest name verbatim: the Host half is loaded from this
+# row, and `dsh.client` in package.json makes the browser half load beside it.
+# `id` is the profile entry id the Plugins page toggles; it must stay stable.
+#
+# No `config` block: this plugin reads no configuration, and an empty block
+# would shadow nothing while pretending to.
+- insert:
+    - id: git-commit
+      name: '@forward/git-commit'
