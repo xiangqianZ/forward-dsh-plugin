@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Workspace model",
-    "description": "Shows and changes the model of a workspace from its right-click or ellipsis menu. New sessions created in the workspace start with the bound model; switching models inside a session still works and does not change the binding."
+    "description": "Shows and changes the model of a workspace from its right-click or ellipsis menu. The current default is pinned to a workspace when its first session is created; after that, temporary model switches inside a session do not change the workspace, and new sessions start on the workspace model."
   }
 }

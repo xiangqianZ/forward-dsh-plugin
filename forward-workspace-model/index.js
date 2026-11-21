@@ -6,6 +6,14 @@
  * plugin writes `model/selection` directly through Agent.model and never calls
  * session/selectModel, so it neither changes the deployment default nor
  * rewrites an existing Session's own choice.
+ *
+ * DSH's own in-session model selector calls session/selectModel, which also
+ * saves its choice as the deployment default. A workspace with no explicit
+ * binding inherits that default, so a temporary switch in a single Session
+ * would otherwise move every future Session in the workspace to the new
+ * model. To prevent that, the first Session created in a workspace pins the
+ * deployment default as that workspace's binding. From then on the workspace
+ * model changes only through this plugin's menu.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -81,6 +89,19 @@ function selectionOf(payload) {
   }
 }
 
+/** Snapshot the deployment default as a clean ModelSelection for pinning. */
+function defaultSelection(ctx) {
+  const current = ctx.agentDefaultModel?.currentSelection?.()
+  if (current === undefined || typeof current.provider !== 'string' || current.provider === ''
+    || typeof current.model !== 'string' || current.model === '') return undefined
+  const effort = current.reasoningEffort
+  return {
+    provider: current.provider,
+    model: current.model,
+    ...(typeof effort === 'string' && effort !== '' ? { reasoningEffort: effort } : {}),
+  }
+}
+
 /** Exact workspace match first, then the nearest registered ancestor. */
 function findBinding(cwd, bindings) {
   if (typeof cwd !== 'string' || cwd === '') return undefined
@@ -122,7 +143,7 @@ function describeError(error) {
 }
 
 /** Services this plugin needs. */
-export const inject = ['connection', 'configEditor', 'workspaceRegistry', 'llm', 'agents']
+export const inject = ['connection', 'configEditor', 'agentDefaultModel', 'workspaceRegistry', 'llm', 'agents']
 
 /** Stable Loader/plugin identity. */
 export const name = 'workspace-model'
@@ -140,13 +161,37 @@ export function apply(ctx, config = {}) {
   let bindings = config.bindings && typeof config.bindings === 'object' && !Array.isArray(config.bindings)
     ? { ...config.bindings }
     : {}
+  let pendingWrite = Promise.resolve()
+
+  /**
+   * Publish bindings in memory immediately, then serialize the profile write.
+   * Serializing keeps a menu `set`/`clear` and an automatic `pin` from
+   * overwriting each other in the config file.
+   */
+  function persist(next) {
+    if (entry === undefined || editor === undefined) {
+      return Promise.reject(fail(CODES.CONFIG_UNAVAILABLE, '当前 profile 无法保存插件配置。'))
+    }
+    bindings = next
+    const write = pendingWrite.then(() => editor.edit(entry, current => ({ ...current, bindings: next })))
+    pendingWrite = write.catch(() => {})
+    return write
+  }
 
   async function save(next) {
-    if (entry === undefined || editor === undefined) {
-      throw fail(CODES.CONFIG_UNAVAILABLE, '当前 profile 无法保存插件配置。')
-    }
-    await editor.edit(entry, current => ({ ...current, bindings: next }))
-    bindings = next
+    await persist(next)
+  }
+
+  /**
+   * Pin a binding in memory at once so concurrent Session creates see it, then
+   * queue the profile write. A failure only costs the pin for this run; it
+   * never blocks the Session from starting.
+   */
+  function pin(dir, selection) {
+    const write = persist({ ...bindings, [dir]: selection })
+    void write.catch(error => {
+      ctx.logger?.warn?.(`workspace-model: failed to pin ${dir}: ${String(error)}`)
+    })
   }
 
   /** Apply a binding to live Sessions that have not made a model request yet. */
@@ -170,8 +215,15 @@ export function apply(ctx, config = {}) {
     // This fires for both fresh creates and resumed blank Sessions. A Session
     // with a request/header has already started and keeps its own choice.
     if (agent.session.requestHeader() !== undefined) return
-    const selection = findBinding(cwd, bindings)
-    if (selection === undefined) return
+    let selection = findBinding(cwd, bindings)
+    if (selection === undefined) {
+      // No explicit binding: pin the deployment default so that a later model
+      // switch inside this Session (which DSH saves as the new deployment
+      // default) cannot move this workspace to a model chosen temporarily.
+      selection = defaultSelection(ctx)
+      if (selection === undefined) return
+      pin(real(cwd), selection)
+    }
     agent.model.select({
       provider: selection.provider,
       model: selection.model,

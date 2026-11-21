@@ -10,7 +10,7 @@ window.__ModuleLoader__.load({
 
     const ZH = {
       'meta.title': '工作区模型',
-      'meta.description': '在工作区的右键或省略号菜单中直接显示并切换该工作区的模型。绑定后，此目录下新建的会话会以该模型启动；会话内切换模型仍然有效，且不会修改工作区绑定。',
+      'meta.description': '在工作区的右键或省略号菜单中直接显示并切换该工作区的模型。工作区首次创建会话时会固定当前默认模型，之后会话内临时切换模型不会影响该工作区；新建的会话会使用工作区绑定的模型。',
       chooseModel: '选择模型',
       pickerTitle: '工作区模型',
       searchPlaceholder: '搜索模型',
@@ -29,7 +29,7 @@ window.__ModuleLoader__.load({
 
     const EN = {
       'meta.title': 'Workspace model',
-      'meta.description': 'Shows and changes the model of a workspace from its right-click or ellipsis menu. New sessions created in the workspace start with the bound model; switching models inside a session still works and does not change the binding.',
+      'meta.description': 'Shows and changes the model of a workspace from its right-click or ellipsis menu. The current default is pinned to a workspace when its first session is created; after that, temporary model switches inside a session do not change the workspace, and new sessions start on the workspace model.',
       chooseModel: 'Choose model',
       pickerTitle: 'Workspace model',
       searchPlaceholder: 'Search models',
