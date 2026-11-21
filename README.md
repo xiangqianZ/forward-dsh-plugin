@@ -9,6 +9,7 @@
 | [`forward-workspace-model`](forward-workspace-model/) | 给工作区绑定模型；该目录下新建会话自动使用绑定模型，会话内切换模型不受影响。 | 侧边栏工作区右键菜单 / `…` 菜单，菜单项显示当前模型名，点击切换 |
 | [`forward-git-commit`](forward-git-commit/) | 在会话标题栏一键提交并推送当前 Git 工作区。 | 会话标题栏右侧「提交」按钮 |
 | [`forward-process-manager`](forward-process-manager/) | 查看并结束当前项目里占用端口的进程。 | 会话标题栏「提交」按钮旁的「进程」按钮 |
+| [`forward-copy-file`](forward-copy-file/) | 右键对话中的文件路径，直接把文件本身复制到系统剪贴板，省去打开所在目录再复制的步骤（仅 macOS）。 | 对话中文件路径右键「复制文件」；文件树目录右键「复制文件夹」 |
 
 每个插件目录里的 `README.md` 有更详细的用法说明。
 
@@ -25,6 +26,9 @@ dsh plugin --profile desktop add ./forward-git-commit
 
 # 项目进程管理
 dsh plugin --profile desktop add ./forward-process-manager
+
+# 右键复制文件（macOS）
+dsh plugin --profile desktop add ./forward-copy-file
 ```
 
 也可以打开 DSH 的 **插件 → 安装插件**，选择对应子目录。

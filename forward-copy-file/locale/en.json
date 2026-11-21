@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Copy file",
+    "description": "Right-click a file path or folder in the conversation and choose Copy file to put the file itself on the macOS clipboard, ready to paste in Finder or anywhere else. macOS only."
+  }
+}

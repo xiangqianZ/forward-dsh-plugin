@@ -1,0 +1,7 @@
+# Bundle patch for @forward/copy-file.
+#
+# `name` matches the package manifest verbatim; the row id is stable and is what
+# the Plugins page toggles. No `config`: this plugin reads none.
+- insert:
+    - id: copy-file
+      name: '@forward/copy-file'
