@@ -2,10 +2,12 @@
  * forward-process-manager — browser half.
  *
  * Deliberately imperative: the slot contributes one plain button, and clicking
- * it creates a single DOM panel directly under document.body. No React portal,
- * no popover state, no outside-click auto-dismiss — those were the pieces that
- * could make the panel flash and vanish in a live composer. Clicking the same
- * trigger again toggles the panel off; the X button and Escape still work too.
+ * it creates a single DOM panel directly under document.body. No React portal
+ * or popover state — those could make the panel flash and vanish in a live
+ * composer. The panel closes on Escape, the X button, the same trigger again,
+ * or a pointer-down anywhere outside it. The outside listener is armed one
+ * tick late and ignores every trigger, so the opening click (and clicking a
+ * second trigger to reposition) cannot close it immediately.
  *
  * @module @forward/process-manager/client
  */
@@ -218,6 +220,8 @@ window.__ModuleLoader__.load({
       if (active === null) return
       if (active.escape !== null) document.removeEventListener('keydown', active.escape)
       if (active.resize !== null) window.removeEventListener('resize', active.resize)
+      if (active.outside !== null) document.removeEventListener('pointerdown', active.outside, true)
+      if (active.armTimer !== null) clearTimeout(active.armTimer)
       if (active.reloadTimer !== null) clearTimeout(active.reloadTimer)
       if (active.interval !== null) clearInterval(active.interval)
       active.root.remove()
@@ -369,15 +373,33 @@ window.__ModuleLoader__.load({
       document.body.appendChild(root)
       const state = {
         root, t, sessionId, anchor, data: null, loading: false,
-        busyPid: null, error: '', notice: '', seq: 0,
-        escape: null, resize: null, reloadTimer: null, interval: null,
+        busyPid: null, error: '', notice: '', seq: 0, armed: false,
+        escape: null, resize: null, outside: null, armTimer: null,
+        reloadTimer: null, interval: null,
       }
       active = state
       place(state)
       state.escape = (event) => { if (event.key === 'Escape') closePanel() }
       state.resize = () => place(state)
+      // Dismiss on pointer-down outside the panel. Ignore clicks on any
+      // trigger: its own onClick toggles/repositions, so treating it as
+      // "outside" would make the panel flash and close on the opening click.
+      state.outside = (event) => {
+        if (active !== state || state.armed !== true) return
+        const target = event.target
+        if (target instanceof Node) {
+          if (state.root.contains(target)) return
+          if (typeof target.closest === 'function' && target.closest('.ppd-trigger') !== null) return
+        }
+        closePanel()
+      }
+      state.armTimer = setTimeout(() => {
+        state.armTimer = null
+        if (active === state) state.armed = true
+      }, 0)
       document.addEventListener('keydown', state.escape)
       window.addEventListener('resize', state.resize)
+      document.addEventListener('pointerdown', state.outside, true)
       state.interval = setInterval(() => { if (active === state) load(state) }, REFRESH_MS)
       load(state)
     }

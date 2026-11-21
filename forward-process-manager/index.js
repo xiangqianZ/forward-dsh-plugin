@@ -2,9 +2,14 @@
  * forward-process-manager — Host half.
  *
  * One authenticated RPC route answers two questions for the browser half:
- * which OS processes belong to the current Session's project directory, and
+ * which OS processes belong to the current Session's workspace, and
  * how to stop one of them. Everything runs through `ctx.subprocess`; nothing
  * shells out through `node:child_process`.
+ *
+ * Ownership is decided by where the *launching DSH session* was created, not
+ * by the process's own cwd: DSH stamps every child with `DSH_SESSION_ID`, and
+ * that session's cwd is the workspace the process belongs to. Processes DSH
+ * did not stamp fall back to cwd/command-line matching.
  *
  * The route is registered on `connection.fetch` under `/api/...` on purpose:
  * that is where the Host/Origin fence and the browser cookie check live, so a
@@ -151,6 +156,21 @@ export function parsePs(stdout) {
   return rows
 }
 
+/** Parse `ps e -axo pid=,command=` into pid -> DSH_SESSION_ID. */
+export function parseEnvPs(stdout) {
+  const sessionByPid = new Map()
+  for (const line of stdout.split('\n')) {
+    const matched = /^\s*(\d+)\s+(.+)$/.exec(line)
+    if (matched === null) continue
+    const pid = Number(matched[1])
+    if (!Number.isSafeInteger(pid) || pid <= 0) continue
+    const token = /(?:^|\s)DSH_SESSION_ID=(\S+)/.exec(matched[2])
+    if (token === null) continue
+    sessionByPid.set(pid, token[1])
+  }
+  return sessionByPid
+}
+
 /** Parse `lsof -nP -a -d cwd -Fpcn` into pid -> cwd. */
 export function parseLsof(stdout) {
   const cwdByPid = new Map()
@@ -230,6 +250,20 @@ export async function listProcesses(ctx, sessionId, signal) {
   }
   const root = await realpath(cwd).catch(() => cwd)
 
+  /**
+   * Workspace root of any session by id, realpath'd. Used to attribute a
+   * process to the workspace where its launching session was created, which
+   * may differ from the process's own cwd (e.g. `cd other/dir && ./server`).
+   */
+  const sessionRoot = new Map()
+  const workspaceOfSession = async (sessionId) => {
+    if (sessionRoot.has(sessionId)) return sessionRoot.get(sessionId)
+    const sessionCwd = await workspaceOf(ctx, sessionId)
+    const resolved = sessionCwd === undefined ? undefined : await realpath(sessionCwd).catch(() => sessionCwd)
+    sessionRoot.set(sessionId, resolved)
+    return resolved
+  }
+
   let psExecutable
   try {
     psExecutable = await ctx.subprocess.resolveExecutable('ps', undefined, signal)
@@ -242,8 +276,22 @@ export async function listProcesses(ctx, sessionId, signal) {
   }
   const rows = parsePs(ps.stdout)
 
-  // cwd improves recall: a `pnpm dev` started in the project has no project
-  // path in its command line, but lsof still reports its cwd.
+  // DSH stamps every process it spawns with DSH_SESSION_ID. That is the source
+  // of truth for which session — and therefore which workspace — launched a
+  // process, independent of the directory it later `cd`'d into. Read it from
+  // `ps e`, keyed by pid, so a server started from workspace A but running out
+  // of directory B still shows up in A (and only A).
+  let sessionByPid = new Map()
+  try {
+    const envPs = await run(ctx, [psExecutable, 'e', '-axo', 'pid=,command='], { signal })
+    if (envPs.exitCode === 0) sessionByPid = parseEnvPs(envPs.stdout)
+  } catch {
+    // The env view is a best effort; fall back to cwd/command matching below.
+  }
+
+  // cwd improves recall for processes DSH did not stamp (started directly in a
+  // terminal, older processes): a `pnpm dev` started in the project has no
+  // project path in its command line, but lsof still reports its cwd.
   let cwdByPid = new Map()
   try {
     const lsof = await ctx.subprocess.resolveExecutable('lsof', undefined, signal)
@@ -280,7 +328,16 @@ export async function listProcesses(ctx, sessionId, signal) {
     const commandMatch = row.command.includes(root)
     const processCwd = cwdByPid.get(row.pid)
     const cwdMatch = inside(processCwd, root)
-    if (!commandMatch && !cwdMatch) continue
+    const launchSessionId = sessionByPid.get(row.pid)
+    const launchRoot = launchSessionId === undefined ? undefined : await workspaceOfSession(launchSessionId)
+    const sessionMatch = launchRoot !== undefined && launchRoot === root
+    // A stamped process belongs to the workspace of its launching session,
+    // regardless of its own cwd/command line. If that session cannot be
+    // resolved (log gone), fall back to command/cwd instead of dropping it.
+    const belongs = launchRoot !== undefined
+      ? sessionMatch
+      : commandMatch || cwdMatch
+    if (!belongs) continue
     processes.push({
       pid: row.pid,
       ppid: row.ppid,
@@ -288,7 +345,10 @@ export async function listProcesses(ctx, sessionId, signal) {
       command: row.command,
       cwd: processCwd ?? null,
       ports,
-      matchedBy: commandMatch && cwdMatch ? 'both' : commandMatch ? 'command' : 'cwd',
+      sessionId: launchSessionId ?? null,
+      matchedBy: sessionMatch
+        ? 'session'
+        : commandMatch && cwdMatch ? 'both' : commandMatch ? 'command' : 'cwd',
     })
     if (processes.length >= MAX_PROCESSES) break
   }
